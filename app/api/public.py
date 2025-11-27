@@ -1,0 +1,100 @@
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from datetime import datetime, time, timedelta, date
+from typing import List
+from ..db import get_db
+from .. import schemas, crud, models
+from ..google_calendar import create_event_for_booking
+
+router = APIRouter(prefix="/public", tags=["public"])
+
+
+def _parse_time_str(s: str) -> time:
+    h, m = map(int, s.split(":"))
+    return time(hour=h, minute=m)
+
+
+def _generate_slots_for_date(
+    event_type: models.EventType, rules: List[models.AvailabilityRule], day: date
+) -> List[schemas.TimeSlot]:
+    slots: List[schemas.TimeSlot] = []
+    duration = timedelta(minutes=event_type.duration_minutes)
+    buffer = timedelta(minutes=event_type.buffer_minutes)
+
+    for rule in rules:
+        start_t = _parse_time_str(rule.start_time)
+        end_t = _parse_time_str(rule.end_time)
+
+        current = datetime.combine(day, start_t)
+        end_dt = datetime.combine(day, end_t)
+
+        while current + duration <= end_dt:
+            slot_start = current
+            slot_end = current + duration
+            slots.append(
+                schemas.TimeSlot(start=slot_start, end=slot_end)
+            )
+            current = slot_end + buffer
+
+    return slots
+
+
+@router.get("/{slug}/details", response_model=schemas.PublicEventTypeRead)
+def get_public_event_type(slug: str, db: Session = Depends(get_db)):
+    et = crud.get_event_type_by_slug(db, slug)
+    if not et or not et.is_active:
+        raise HTTPException(status_code=404, detail="Event type not found")
+    return et
+
+
+@router.get("/{slug}/slots", response_model=List[schemas.TimeSlot])
+def get_slots_for_date(
+    slug: str,
+    date_str: str = Query(..., alias="date"),
+    db: Session = Depends(get_db),
+):
+    et = crud.get_event_type_by_slug(db, slug)
+    if not et or not et.is_active:
+        raise HTTPException(status_code=404, detail="Event type not found")
+
+    try:
+        day = datetime.fromisoformat(date_str).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+
+    weekday = day.weekday()  # 0-6
+    rules = [
+        r for r in et.availability_rules
+        if r.weekday == weekday
+    ]
+    slots = _generate_slots_for_date(et, rules, day)
+    # later: filter by min_notice, Google busy intervals
+    return slots
+
+
+@router.post("/{slug}/book", response_model=schemas.BookingRead)
+def book_slot(
+    slug: str,
+    data: schemas.BookingCreate,
+    db: Session = Depends(get_db),
+):
+    et = crud.get_event_type_by_slug(db, slug)
+    if not et or not et.is_active:
+        raise HTTPException(status_code=404, detail="Event type not found")
+
+    # TODO later: validate that the requested slot matches available slots
+    booking = crud.create_booking(db, et, data)
+
+    # Try to create Google Calendar event
+    try:
+        event_id = create_event_for_booking(booking, et)
+        booking.gcal_event_id = event_id
+        db.commit()
+        db.refresh(booking)
+    except Exception as e:
+        # For now just log to console; you can improve error handling later
+        print("Failed to create Google Calendar event:", e)
+
+    return booking
+
