@@ -63,7 +63,7 @@ def get_slots_for_date(
         day = datetime.fromisoformat(date_str).date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
-
+        
     weekday = day.weekday()
     rules = [r for r in et.availability_rules if r.weekday == weekday]
     possible_slots = _generate_slots_for_date(et, rules, day)
@@ -80,15 +80,13 @@ def get_slots_for_date(
     end_of_day = tz.localize(end_of_day)
 
     try:
-        busy_times = get_busy_intervals(start_of_day, end_of_day)
+        busy_times = get_busy_intervals(et.owner, start_of_day, end_of_day)
     except Exception as e:
         print(f"Google Calendar Error: {e}")
-      
         busy_times = []
 
     final_slots = []
     for slot in possible_slots:
-       
         if not is_overlapping(slot.start, slot.end, busy_times):
             final_slots.append(slot)
 
@@ -106,7 +104,7 @@ def book_slot(
 
     # TODO later: validate that the requested slot matches available slots
     booking = crud.create_booking(db, et, data)
-
+    booking.status = "pending"
     try:
         event_id = create_event_for_booking(booking, et)
         booking.gcal_event_id = event_id
@@ -114,6 +112,6 @@ def book_slot(
         db.refresh(booking)
     except Exception as e:
         print("Failed to create Google Calendar event:", e)
-
+   
     return booking
 
