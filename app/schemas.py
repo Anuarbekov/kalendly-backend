@@ -85,7 +85,7 @@ class PublicEventTypeRead(BaseModel):
     slug: str
     duration_minutes: int
     location_type: str
-
+    host_name: str
     class Config:
         orm_mode = True
 

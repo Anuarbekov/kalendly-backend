@@ -46,7 +46,14 @@ def get_public_event_type(slug: str, db: Session = Depends(get_db)):
     et = crud.get_event_type_by_slug(db, slug)
     if not et or not et.is_active:
         raise HTTPException(status_code=404, detail="Event type not found")
-    return et
+    
+    return schemas.PublicEventTypeRead(
+        name=et.name,
+        slug=et.slug,
+        duration_minutes=et.duration_minutes,
+        location_type=et.location_type,
+        host_name=et.owner.email
+    )
 
 
 @router.get("/{slug}/slots", response_model=List[schemas.TimeSlot])
@@ -103,9 +110,11 @@ def book_slot(
         raise HTTPException(status_code=404, detail="Event type not found")
 
     # TODO later: validate that the requested slot matches available slots
-    booking = crud.create_booking(db, et, data)
-    booking.status = "pending"
+    booking = {}
     try:
+        booking = crud.create_booking(db, et, data)
+        booking.status = "pending"
+        print(data)
         event_id = create_event_for_booking(booking, et)
         booking.gcal_event_id = event_id
         db.commit()

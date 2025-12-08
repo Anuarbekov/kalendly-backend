@@ -4,8 +4,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import pytz
 
-# Constants
-DEFAULT_TIMEZONE = "Asia/Almaty" # Or your preferred default
+DEFAULT_TIMEZONE = "Asia/Almaty"
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
 def get_google_service(user):
@@ -47,7 +46,6 @@ def get_busy_intervals(user, start_dt: datetime, end_dt: datetime):
         primary_cal = calendars.get('primary', {})
         busy = primary_cal.get('busy', [])
         
-        # Convert string ISO times to datetime objects for comparison
         cleaned_busy = []
         for interval in busy:
             cleaned_busy.append({
@@ -65,7 +63,6 @@ def is_overlapping(slot_start: datetime, slot_end: datetime, busy_times: list) -
     Checks if a specific slot overlaps with any busy interval.
     Handles timezone naive/aware comparison.
     """
-    # Ensure slot times are timezone-aware (using default if naive)
     tz = pytz.timezone(DEFAULT_TIMEZONE)
     if slot_start.tzinfo is None:
         slot_start = tz.localize(slot_start)
@@ -73,26 +70,20 @@ def is_overlapping(slot_start: datetime, slot_end: datetime, busy_times: list) -
         slot_end = tz.localize(slot_end)
 
     for busy in busy_times:
-        # Busy times from Google are usually aware (UTC or local)
         b_start = busy['start']
         b_end = busy['end']
         
-        # Overlap Logic: (StartA < EndB) and (EndA > StartB)
         if slot_start < b_end and slot_end > b_start:
             return True
             
     return False
 
 def create_event_for_booking(booking, event_type):
-    """
-    Creates the actual event in Google Calendar.
-    """
-    # 1. Get the Host (Owner of the event type)
+    print(event_type)
     host = event_type.owner 
     
     service = get_google_service(host)
 
-    # 2. Prepare Data
     event_body = {
         'summary': f"{event_type.title} with {booking.invitee_name}",
         'description': f"Notes: {booking.invitee_note}",
@@ -108,7 +99,6 @@ def create_event_for_booking(booking, event_type):
             {'email': booking.invitee_email},
             {'email': host.email}, 
         ],
-        # Add Google Meet Link
         'conferenceData': {
             'createRequest': {
                 'requestId': f"meet-{booking.id}", 
@@ -117,7 +107,6 @@ def create_event_for_booking(booking, event_type):
         },
     }
 
-    # 3. Execute
     event = service.events().insert(
         calendarId='primary',
         body=event_body,
@@ -126,3 +115,4 @@ def create_event_for_booking(booking, event_type):
     ).execute()
 
     return event.get('id')
+    

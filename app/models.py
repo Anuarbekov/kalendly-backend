@@ -16,7 +16,8 @@ class EventType(Base):
     min_notice_minutes = Column(Integer, default=60)
     buffer_minutes = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
-
+    user_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="event_types")
     availability_rules = relationship(
         "AvailabilityRule", back_populates="event_type", cascade="all, delete-orphan"
     )
@@ -46,7 +47,7 @@ class Booking(Base):
     invitee_email = Column(String, nullable=False)
     invitee_note = Column(String, nullable=True)
     status = Column(String, default="confirmed")
-    gcal_event_id = Column(String, nullable=True)
+    gcal_event_id = Column(String, nullable=False)
     event_type = relationship("EventType", back_populates="bookings")
 
 class User(Base):
@@ -56,3 +57,4 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     google_access_token = Column(String, nullable=True)
     google_refresh_token = Column(String, nullable=True)
+    event_types = relationship("EventType", back_populates="owner")
