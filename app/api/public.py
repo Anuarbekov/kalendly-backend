@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta, date
 from typing import List
 from ..db import get_db
 from .. import schemas, crud, models
-from ..google_calendar import create_event_for_booking,get_busy_intervals, is_overlapping, DEFAULT_TIMEZONE
+from ..services.google_calendar import create_event_for_booking,get_busy_intervals, is_overlapping, DEFAULT_TIMEZONE
 
 router = APIRouter(prefix="/public", tags=["public"])
 
