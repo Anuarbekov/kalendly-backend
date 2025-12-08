@@ -2,18 +2,22 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+
+from app.api.auth import get_current_user
+
 from ..db import get_db
 from .. import schemas, crud, models
+
 
 router = APIRouter(prefix="/event-types", tags=["event-types"])
 
 
 @router.post("/", response_model=schemas.EventTypeRead)
 def create_event_type(
-    event: schemas.EventTypeCreate, db: Session = Depends(get_db)
+    event: schemas.EventTypeCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     # (later: check slug uniqueness properly)
-    return crud.create_event_type(db, event)
+    return crud.create_event_type(db, event, user_id=current_user.id)
 
 
 @router.get("/", response_model=List[schemas.EventTypeRead])

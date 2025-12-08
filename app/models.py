@@ -48,3 +48,11 @@ class Booking(Base):
     status = Column(String, default="confirmed")
     gcal_event_id = Column(String, nullable=True)
     event_type = relationship("EventType", back_populates="bookings")
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    google_access_token = Column(String, nullable=True)
+    google_refresh_token = Column(String, nullable=True)

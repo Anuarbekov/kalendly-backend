@@ -1,11 +1,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+import pytz
 from sqlalchemy.orm import Session
 from datetime import datetime, time, timedelta, date
 from typing import List
 from ..db import get_db
 from .. import schemas, crud, models
-from ..google_calendar import create_event_for_booking
+from ..google_calendar import create_event_for_booking,get_busy_intervals, is_overlapping, DEFAULT_TIMEZONE
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -63,15 +64,35 @@ def get_slots_for_date(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
 
-    weekday = day.weekday()  # 0-6
-    rules = [
-        r for r in et.availability_rules
-        if r.weekday == weekday
-    ]
-    slots = _generate_slots_for_date(et, rules, day)
-    # later: filter by min_notice, Google busy intervals
-    return slots
+    weekday = day.weekday()
+    rules = [r for r in et.availability_rules if r.weekday == weekday]
+    possible_slots = _generate_slots_for_date(et, rules, day)
 
+    if not possible_slots:
+        return []
+
+    tz = pytz.timezone(DEFAULT_TIMEZONE)
+    
+    start_of_day = datetime.combine(day, time.min)
+    start_of_day = tz.localize(start_of_day)
+    
+    end_of_day = datetime.combine(day, time.max)
+    end_of_day = tz.localize(end_of_day)
+
+    try:
+        busy_times = get_busy_intervals(start_of_day, end_of_day)
+    except Exception as e:
+        print(f"Google Calendar Error: {e}")
+      
+        busy_times = []
+
+    final_slots = []
+    for slot in possible_slots:
+       
+        if not is_overlapping(slot.start, slot.end, busy_times):
+            final_slots.append(slot)
+
+    return final_slots
 
 @router.post("/{slug}/book", response_model=schemas.BookingRead)
 def book_slot(
@@ -86,14 +107,12 @@ def book_slot(
     # TODO later: validate that the requested slot matches available slots
     booking = crud.create_booking(db, et, data)
 
-    # Try to create Google Calendar event
     try:
         event_id = create_event_for_booking(booking, et)
         booking.gcal_event_id = event_id
         db.commit()
         db.refresh(booking)
     except Exception as e:
-        # For now just log to console; you can improve error handling later
         print("Failed to create Google Calendar event:", e)
 
     return booking

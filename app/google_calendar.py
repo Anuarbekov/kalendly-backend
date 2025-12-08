@@ -6,16 +6,55 @@ from typing import Optional
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-
+from datetime import timedelta
+import pytz
 from .models import Booking, EventType
 
-# Same scope as in google_auth_setup.py
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+import os
+from typing import Any 
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-# Change this to your timezone if you want (right now it's Almaty)
 DEFAULT_TIMEZONE = "Asia/Almaty"
 
 
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+
+def get_creds_from_user(user: Any) -> Credentials:
+    creds = Credentials(
+        token=user.google_access_token,
+        refresh_token=user.google_refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=SCOPES
+    )
+    
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            user.google_access_token = creds.token
+        except Exception as e:
+            print(f"Error refreshing token: {e}")
+            return None
+
+    return creds
+
+def get_service(user: Any):
+    creds = get_creds_from_user(user)
+    if not creds:
+        return None
+    return build("calendar", "v3", credentials=creds)
+
+
+# Update your create_event function to accept a USER, not read a file
+def create_event_for_booking(booking, event_type, user):
+    service = get_service(user) # Pass the user object here
+    if not service:
+        raise Exception("Could not authenticate with Google")
 def _get_creds() -> Credentials:
     """
     Load credentials from token.json and refresh if needed.
@@ -87,3 +126,47 @@ def create_event_for_booking(
 
     event = service.events().insert(calendarId=calendar_id, body=event_body).execute()
     return event.get("id")
+def get_busy_intervals(
+    start_dt: datetime, 
+    end_dt: datetime, 
+    calendar_id: str = "primary"
+) -> list:
+    """
+    Fetch 'busy' intervals from Google Calendar between two datetimes.
+    """
+    service = _get_service()
+    
+    body = {
+        "timeMin": start_dt.isoformat(),
+        "timeMax": end_dt.isoformat(),
+        "timeZone": DEFAULT_TIMEZONE, 
+        "items": [{"id": calendar_id}]
+    }
+
+    events_result = service.freebusy().query(body=body).execute()
+    calendars = events_result.get("calendars", {})
+    cal_data = calendars.get(calendar_id, {})
+    return cal_data.get("busy", [])
+def is_overlapping(slot_start: datetime, slot_end: datetime, busy_intervals: list) -> bool:
+    """
+    Check if a specific time slot overlaps with any busy interval.
+    """
+    # 1. Ensure slot times are timezone aware (localize to your default settings)
+    tz = pytz.timezone(DEFAULT_TIMEZONE)
+    if slot_start.tzinfo is None:
+        slot_start = tz.localize(slot_start)
+    if slot_end.tzinfo is None:
+        slot_end = tz.localize(slot_end)
+
+    for interval in busy_intervals:
+        # Google returns ISO strings, usually in UTC (Z) or with offset
+        # We parse them into datetime objects
+        b_start = datetime.fromisoformat(interval["start"].replace("Z", "+00:00"))
+        b_end = datetime.fromisoformat(interval["end"].replace("Z", "+00:00"))
+
+        # 2. Check for overlap
+        # Logic: (StartA < EndB) and (EndA > StartB)
+        if slot_start < b_end and slot_end > b_start:
+            return True
+            
+    return False
