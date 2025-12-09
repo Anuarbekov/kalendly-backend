@@ -109,18 +109,23 @@ def book_slot(
     if not et or not et.is_active:
         raise HTTPException(status_code=404, detail="Event type not found")
 
-    # TODO later: validate that the requested slot matches available slots
-    booking = {}
+    booking = crud.create_booking(db, et, data)
+    if not booking:
+        raise HTTPException(status_code=500, detail="Internal Server Error: Booking creation failed")
+
+    booking.status = "pending"
+    db.commit()      # Save pending state
+    db.refresh(booking)
     try:
-        booking = crud.create_booking(db, et, data)
-        booking.status = "pending"
-        print(data)
         event_id = create_event_for_booking(booking, et)
         booking.gcal_event_id = event_id
-        db.commit()
+        db.add(booking)
+        db.commit()  # Update with GCal ID
         db.refresh(booking)
     except Exception as e:
-        print("Failed to create Google Calendar event:", e)
+        # If Google fails, we log it, but the USER still gets their booking confirmation
+        print(f"WARNING: Failed to create Google Calendar event: {e}")
+        # Optional: You could append a warning note to the response if your schema allows it
    
     return booking
 

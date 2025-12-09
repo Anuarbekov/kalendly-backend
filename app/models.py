@@ -47,7 +47,7 @@ class Booking(Base):
     invitee_email = Column(String, nullable=False)
     invitee_note = Column(String, nullable=True)
     status = Column(String, default="confirmed")
-    gcal_event_id = Column(String, nullable=False)
+    gcal_event_id = Column(String, nullable=True)
     event_type = relationship("EventType", back_populates="bookings")
 
 class User(Base):

@@ -79,20 +79,20 @@ def is_overlapping(slot_start: datetime, slot_end: datetime, busy_times: list) -
     return False
 
 def create_event_for_booking(booking, event_type):
-    print(event_type)
+    print(booking)
     host = event_type.owner 
     
     service = get_google_service(host)
 
     event_body = {
-        'summary': f"{event_type.title} with {booking.invitee_name}",
+        'summary': f"{event_type.name} with {booking.invitee_name}",
         'description': f"Notes: {booking.invitee_note}",
         'start': {
-            'dateTime': booking.start_time.isoformat(),
+            'dateTime': booking.start_datetime.isoformat(),
             'timeZone': DEFAULT_TIMEZONE,
         },
         'end': {
-            'dateTime': booking.end_time.isoformat(),
+            'dateTime': booking.end_datetime.isoformat(),
             'timeZone': DEFAULT_TIMEZONE,
         },
         'attendees': [
