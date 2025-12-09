@@ -14,9 +14,9 @@ router = APIRouter(prefix="/event-types", tags=["event-types"])
 
 @router.post("/", response_model=schemas.EventTypeRead)
 def create_event_type(
-    event: schemas.EventTypeCreate, db: Session = Depends(get_db)
+    event: schemas.EventTypeCreate, db: Session = Depends(get_db),current_user: models.User = Depends(get_current_user)
 ):
-    return crud.create_event_type(db, event)
+    return crud.create_event_type(db, event, user_id=current_user.id)
 
 
 @router.get("/", response_model=List[schemas.EventTypeRead])

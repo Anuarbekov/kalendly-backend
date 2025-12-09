@@ -16,7 +16,7 @@ class EventType(Base):
     min_notice_minutes = Column(Integer, default=60)
     buffer_minutes = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", back_populates="event_types")
     availability_rules = relationship(
         "AvailabilityRule", back_populates="event_type", cascade="all, delete-orphan"

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import os
 from typing import Optional
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, status
 from authlib.integrations.starlette_client import OAuth
 import httpx
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from .. import models
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 load_dotenv()
 
@@ -117,6 +117,31 @@ async def login_via_google(
         "token_type": "bearer",
         "email": email
     }
+
+@router.post("/login") # This matches your tokenUrl="auth/login" (prefix is /auth)
+def login_for_swagger(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    """
+    DEV ONLY: Logs in a user by email (ignores password).
+    Allows Swagger UI to authorize using existing DB users.
+    """
+    # 1. Find user by email (Swagger sends email in the 'username' field)
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+
+    # 2. Create the JWT Token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, 
+        expires_delta=access_token_expires
+    )
+    
+    # 3. Return exact format Swagger expects
+    return {"access_token": access_token, "token_type": "bearer"}
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(

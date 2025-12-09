@@ -5,8 +5,8 @@ from . import models, schemas
 
 
 # ---------- EventType ----------
-def create_event_type(db: Session, data: schemas.EventTypeCreate) -> models.EventType:
-    et = models.EventType(**data.dict())
+def create_event_type(db: Session, data: schemas.EventTypeCreate, user_id: int) -> models.EventType:
+    et = models.EventType(**data.dict(), user_id=user_id)
     db.add(et)
     db.commit()
     db.refresh(et)
