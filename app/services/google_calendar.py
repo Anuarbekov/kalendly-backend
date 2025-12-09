@@ -61,9 +61,10 @@ def get_busy_intervals(user, start_dt: datetime, end_dt: datetime):
 def is_overlapping(slot_start: datetime, slot_end: datetime, busy_times: list) -> bool:
     """
     Checks if a specific slot overlaps with any busy interval.
-    Handles timezone naive/aware comparison.
+    Robustly handles mixed naive/aware datetimes.
     """
     tz = pytz.timezone(DEFAULT_TIMEZONE)
+
     if slot_start.tzinfo is None:
         slot_start = tz.localize(slot_start)
     if slot_end.tzinfo is None:
@@ -72,6 +73,11 @@ def is_overlapping(slot_start: datetime, slot_end: datetime, busy_times: list) -
     for busy in busy_times:
         b_start = busy['start']
         b_end = busy['end']
+
+        if b_start.tzinfo is None:
+            b_start = tz.localize(b_start)
+        if b_end.tzinfo is None:
+            b_end = tz.localize(b_end)
         
         if slot_start < b_end and slot_end > b_start:
             return True

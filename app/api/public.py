@@ -70,7 +70,7 @@ def get_slots_for_date(
         day = datetime.fromisoformat(date_str).date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
-        
+
     weekday = day.weekday()
     rules = [r for r in et.availability_rules if r.weekday == weekday]
     possible_slots = _generate_slots_for_date(et, rules, day)
@@ -79,22 +79,34 @@ def get_slots_for_date(
         return []
 
     tz = pytz.timezone(DEFAULT_TIMEZONE)
-    
-    start_of_day = datetime.combine(day, time.min)
-    start_of_day = tz.localize(start_of_day)
-    
-    end_of_day = datetime.combine(day, time.max)
-    end_of_day = tz.localize(end_of_day)
+    start_of_day = tz.localize(datetime.combine(day, time.min))
+    end_of_day = tz.localize(datetime.combine(day, time.max))
 
+    google_busy = []
     try:
-        busy_times = get_busy_intervals(et.owner, start_of_day, end_of_day)
+        google_busy = get_busy_intervals(et.owner, start_of_day, end_of_day)
     except Exception as e:
-        print(f"Google Calendar Error: {e}")
-        busy_times = []
+        print(f"Google Calendar Error: {e}") 
+       
+    local_bookings = db.query(models.Booking).filter(
+        models.Booking.event_type_id == et.id,
+        models.Booking.start_datetime >= day, # Simplified check
+        models.Booking.end_datetime <= datetime.combine(day, time.max),
+        models.Booking.status != "cancelled"  # Ignore cancelled bookings
+    ).all()
+
+    local_busy = []
+    for b in local_bookings:
+        local_busy.append({
+            'start': b.start_datetime,
+            'end': b.end_datetime
+        })
+
+    all_busy_times = google_busy + local_busy
 
     final_slots = []
     for slot in possible_slots:
-        if not is_overlapping(slot.start, slot.end, busy_times):
+        if not is_overlapping(slot.start, slot.end, all_busy_times):
             final_slots.append(slot)
 
     return final_slots
