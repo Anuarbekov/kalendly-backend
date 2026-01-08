@@ -20,4 +20,5 @@ dependencies = [
     "pytz>=2024.1",
     "starlette>=0.37.0",
     "itsdangerous>=2.1.0",
+    "python-multipart>=0.0.6",
 ]
