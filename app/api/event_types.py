@@ -64,7 +64,6 @@ def patch_event_type(
 
 @router.delete("/{event_type_id}")
 def delete_event_type(event_type_id: int, db: Session = Depends(get_db)):
-    print("Deleting event type with ID:", event_type_id)
     et = crud.get_event_type(db, event_type_id)
     if not et:
         raise HTTPException(status_code=404, detail="Event type not found")

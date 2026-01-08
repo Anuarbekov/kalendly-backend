@@ -28,6 +28,5 @@ def update_availability(
     et = crud.get_event_type(db, event_type_id)
     if not et:
         raise HTTPException(status_code=404, detail="Event type not found")
-    print(rules)
     updated_rules = crud.update_availability_rules(db, et, rules)
     return updated_rules
