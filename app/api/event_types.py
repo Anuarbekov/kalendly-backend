@@ -43,9 +43,28 @@ def update_event_type(
         raise HTTPException(status_code=404, detail="Event type not found")
     return crud.update_event_type(db, et, data)
 
+@router.patch("/{event_type_id}", response_model=schemas.EventTypeRead)
+def patch_event_type(
+    event_type_id: int,
+    data: dict, # Using dict to accept partial updates dynamically
+    db: Session = Depends(get_db),
+):
+    et = crud.get_event_type(db, event_type_id)
+    if not et:
+        raise HTTPException(status_code=404, detail="Event type not found")
+    
+    # Update only the fields provided in the request body
+    for key, value in data.items():
+        if hasattr(et, key):
+            setattr(et, key, value)
+            
+    db.commit()
+    db.refresh(et)
+    return et
 
 @router.delete("/{event_type_id}")
 def delete_event_type(event_type_id: int, db: Session = Depends(get_db)):
+    print("Deleting event type with ID:", event_type_id)
     et = crud.get_event_type(db, event_type_id)
     if not et:
         raise HTTPException(status_code=404, detail="Event type not found")

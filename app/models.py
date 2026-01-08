@@ -21,7 +21,7 @@ class EventType(Base):
     availability_rules = relationship(
         "AvailabilityRule", back_populates="event_type", cascade="all, delete-orphan"
     )
-    bookings = relationship("Booking", back_populates="event_type")
+    bookings = relationship("Booking", back_populates="event_type", cascade="all, delete-orphan")
 
 
 class AvailabilityRule(Base):

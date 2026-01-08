@@ -64,6 +64,29 @@ def set_availability_rules(
         db.refresh(r)
     return new_rules
 
+def update_availability_rules(
+    db: Session,
+    event_type: models.EventType,
+    rules: List[schemas.AvailabilityRuleCreate],
+) -> List[models.AvailabilityRule]:
+    
+    for existing_rule in list(event_type.availability_rules):
+        db.delete(existing_rule)
+    
+    db.flush() 
+
+    for r in rules:
+        rule = models.AvailabilityRule(
+            event_type_id=event_type.id, 
+            weekday=r.weekday,
+            start_time=r.start_time,
+            end_time=r.end_time
+        )
+        db.add(rule)
+
+    db.commit()
+    db.refresh(event_type)
+    return event_type.availability_rules
 
 # ---------- Booking ----------
 def create_booking(
